@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Asynq 面板</title>
+<!-- 引入 CodeMirror 样式与 Dracula 暗黑主题 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/theme/dracula.min.css">
+
+<style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 30px; background-color: #f7fafc; color: #2d3748; }
+    h1 { margin-bottom: 24px; color: #1a202c; }
+    h2 { margin-top: 30px; margin-bottom: 14px; color: #4a5568; font-size: 20px; }
+    
+    /* 表格样式优化 */
+    table { border-collapse: collapse; width: 100%; margin-bottom: 30px; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
+    th, td { border: 1px solid #e2e8f0; padding: 12px 16px; text-align: left; }
+    th { background-color: #edf2f7; font-weight: 600; color: #4a5568; }
+    tr:hover { background-color: #f8fafc; }
+    
+    /* 原有按钮基础样式统一 */
+    button { padding: 6px 12px; margin-right: 5px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; transition: background 0.2s; }
+    .delete-btn { background-color: #e53e3e; color: white; }
+    .delete-btn:hover { background-color: #c53030; }
+    .view-tasks-btn { background-color: #38a169; color: white; }
+    .view-tasks-btn:hover { background-color: #2f855a; }
+    
+    /* ================= 推送任务卡片表单样式 ================= */
+    .push-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 24px;
+        max-width: 600px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        margin-bottom: 40px;
+    }
+    .push-card h3 {
+        margin-top: 0;
+        margin-bottom: 20px;
+        color: #2d3748;
+        font-size: 18px;
+        border-bottom: 2px solid #edf2f7;
+        padding-bottom: 10px;
+    }
+    .form-group {
+        margin-bottom: 18px;
+    }
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 6px;
+        color: #4a5568;
+        font-size: 14px;
+    }
+    .form-control {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #cbd5e0;
+        border-radius: 6px;
+        box-sizing: border-box;
+        font-size: 14px;
+        transition: all 0.2s ease;
+        background-color: #fff;
+    }
+    .form-control:focus {
+        outline: none;
+        border-color: #3182ce;
+        box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.25);
+    }
+    
+    /* JSON 编译器布局工具栏 */
+    .json-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+    }
+    .json-tools {
+        display: flex;
+        gap: 6px;
+    }
+    .btn-mini {
+        padding: 3px 8px;
+        font-size: 12px;
+        background: #edf2f7;
+        border: 1px solid #cbd5e0;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 0;
+        color: #4a5568;
+    }
+    .btn-mini:hover { background: #e2e8f0; }
+    
+    /* CodeMirror 高度与边框圆角 */
+    .CodeMirror {
+        border: 1px solid #cbd5e0;
+        border-radius: 6px;
+        height: 180px;
+        font-family: 'Fira Code', 'Courier New', Courier, monospace;
+        font-size: 14px;
+    }
+    .CodeMirror-focused {
+        border-color: #3182ce;
+        box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.25);
+    }
+    .error-msg {
+        color: #e53e3e;
+        font-size: 12px;
+        margin-top: 6px;
+        display: none;
+    }
+    .btn-submit {
+        background-color: #3182ce;
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        font-size: 15px;
+        font-weight: 600;
+        border-radius: 6px;
+        cursor: pointer;
+        width: 100%;
+        transition: background-color 0.2s ease;
+        box-shadow: 0 2px 4px rgba(49, 130, 206, 0.2);
+        margin-top: 8px;
+    }
+    .btn-submit:hover { background-color: #2b6cb0; }
+    .btn-submit:active { background-color: #2c5282; }
+
+    /* ================= 消费者状态标签 ================= */
+    .status-badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .status-active { background-color: #c6f6d5; color: #276749; }
+    .status-stopped { background-color: #fed7d7; color: #9b2c2c; }
+    .view-workers-btn { background-color: #805ad5; color: white; }
+    .view-workers-btn:hover { background-color: #6b46c1; }
+    .queue-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+    .queue-tag {
+        display: inline-block;
+        background: #edf2f7;
+        color: #4a5568;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+    }
+    .worker-details {
+        background-color: #f5f0ff;
+        border-left: 4px solid #805ad5;
+        padding: 12px;
+        margin: 8px 0;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+    .worker-details pre {
+        background: #edf2f7;
+        padding: 8px;
+        border-radius: 4px;
+        margin: 5px 0 0 0;
+    }
+
+    /* ================= 模态框样式 ================= */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 100;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0,0,0,0.4);
+    }
+    .modal-content {
+        background-color: #fefefe;
+        margin: 5% auto;
+        padding: 20px;
+        border: 1px solid #888;
+        width: 80%;
+        max-height: 80vh;
+        overflow-y: auto;
+        border-radius: 8px;
+    }
+    .close {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+    }
+    .close:hover,
+    .close:focus {
+        color: black;
+        text-decoration: none;
+        cursor: pointer;
+    }
+    .task-details {
+        background-color: #f9f9f9;
+        border-left: 4px solid #4CAF50;
+        padding: 12px;
+        margin: 8px 0;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+    .task-details pre {
+        background: #f1f1f1;
+        padding: 8px;
+        border-radius: 4px;
+        margin: 5px 0 0 0;
+    }
+    .tab {
+        overflow: hidden;
+        border: 1px solid #ccc;
+        background-color: #f1f1f1;
+        margin-top: 10px;
+        border-radius: 4px 4px 0 0;
+    }
+    .tab button {
+        background-color: inherit;
+        float: left;
+        border: none;
+        outline: none;
+        cursor: pointer;
+        padding: 14px 16px;
+        transition: 0.3s;
+        font-size: 15px;
+        border-radius: 0;
+    }
+    .tab button:hover {
+        background-color: #ddd;
+    }
+    .tab button.active {
+        background-color: #4CAF50;
+        color: white;
+    }
+    .tabcontent {
+        display: none;
+        padding: 12px;
+        border: 1px solid #ccc;
+        border-top: none;
+        background: #fff;
+        border-radius: 0 0 4px 4px;
+    }
+</style>
+</head>
+<body>
+
+<h1>Asynq 管理面板</h1>
+
+<h2>队列状态</h2>
+<table id="queueTable">
+    <thead>
+        <tr>
+            <th>队列名称</th>
+            <th>待处理任务数</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<h2>消费者（Servers）</h2>
+<table id="consumerTable">
+    <thead>
+        <tr>
+            <th>Host:PID</th>
+            <th>Concurrency</th>
+            <th>监听队列</th>
+            <th>活跃 Worker 数</th>
+            <th>状态</th>
+            <th>启动时间</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+
+<!-- 推送任务独立卡片 -->
+<div class="push-card">
+    <h3>推送新任务</h3>
+    <div class="form-group">
+        <label for="queue">队列名称</label>
+        <input type="text" id="queue" class="form-control" value="default" placeholder="请输入队列名">
+    </div>
+    <div class="form-group">
+        <label for="type">任务类型 (Type)</label>
+        <input type="text" id="type" class="form-control" value="email:send" placeholder="例如 email:send">
+    </div>
+    <div class="form-group">
+        <div class="json-header">
+            <label>Payload (JSON 编译器)</label>
+            <div class="json-tools">
+                <button type="button" class="btn-mini" onclick="beautifyJSON()">格式化</button>
+                <button type="button" class="btn-mini" onclick="minifyJSON()">压缩</button>
+            </div>
+        </div>
+        <!-- 保持原 id 以兼容底层 pushTask 提取数据 -->
+        <textarea id="payload" style="display: none;">{"to":"test@example.com"}</textarea>
+        <div id="json-error" class="error-msg">⚠️ 错误的 JSON 格式</div>
+    </div>
+    <button class="btn-submit" onclick="handlePush()">立即推送任务</button>
+</div>
+
+
+<!-- 查看任务模态框 -->
+<div id="taskModal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2 id="modalTitle">队列任务详情</h2>
+        <div class="tab">
+            <button class="tablinks active" onclick="openTab(event, 'pending')">待处理</button>
+            <button class="tablinks" onclick="openTab(event, 'scheduled')">计划</button>
+            <button class="tablinks" onclick="openTab(event, 'retry')">重试</button>
+        </div>
+        
+        <div id="pending" class="tabcontent" style="display: block;">
+            <div id="pendingTasks"></div>
+        </div>
+        
+        <div id="scheduled" class="tabcontent">
+            <div id="scheduledTasks"></div>
+        </div>
+        
+        <div id="retry" class="tabcontent">
+            <div id="retryTasks"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 查看 Worker 模态框 -->
+<div id="workerModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="workerModalClose">&times;</span>
+        <h2 id="workerModalTitle">Server 活跃 Workers</h2>
+        <div id="workerList"></div>
+    </div>
+</div>
+
+<!-- 引入 CodeMirror 核心脚本 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/mode/javascript/javascript.min.js"></script>
+
+<script>
+// ==================== 1. JSON 编译器核心控制 ====================
+const jsonEditor = CodeMirror.fromTextArea(document.getElementById('payload'), {
+    mode: "application/json",
+    theme: "dracula",
+    lineNumbers: true,
+    matchBrackets: true,
+    lineWrapping: true
+});
+
+// 实时语法检查
+jsonEditor.on("change", function(cm) {
+    const errorDiv = document.getElementById('json-error');
+    try {
+        const val = cm.getValue().trim();
+        if(val !== "") JSON.parse(val);
+        errorDiv.style.display = 'none';
+    } catch (e) {
+        errorDiv.style.display = 'block';
+        errorDiv.innerText = "⚠️ JSON 格式错误: " + e.message;
+    }
+});
+
+function beautifyJSON() {
+    try {
+        const raw = jsonEditor.getValue();
+        const parsed = JSON.parse(raw);
+        jsonEditor.setValue(JSON.stringify(parsed, null, 4));
+    } catch (e) {
+        alert("格式化失败，请先修正 JSON 语法错误！");
+    }
+}
+
+function minifyJSON() {
+    try {
+        const raw = jsonEditor.getValue();
+        const parsed = JSON.parse(raw);
+        jsonEditor.setValue(JSON.stringify(parsed));
+    } catch (e) {
+        alert("压缩失败，请先修正 JSON 语法错误！");
+    }
+}
+
+// 拦截提交动作
+function handlePush() {
+    jsonEditor.save(); // 同步回隐藏的 textarea
+    
+    try {
+        const currentVal = document.getElementById('payload').value.trim();
+        if(currentVal !== "") JSON.parse(currentVal);
+    } catch(e) {
+        alert("错误：无法发送！Payload 存在 JSON 格式异常，请调整后再试。");
+        return;
+    }
+    pushTask();
+}
+
+
+// ==================== 2. 原生 API 业务交互逻辑 ====================
+async function fetchQueues() {
+    try {
+        const res = await fetch('http://localhost:8080/queues');
+        const data = await res.json();
+        const tbody = document.querySelector('#queueTable tbody');
+        tbody.innerHTML = '';
+        for (let queue in data) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${queue}</td>
+                <td>${data[queue]}</td>
+                <td>
+                    <button class="view-tasks-btn" onclick="viewQueueTasks('${queue}')">查看任务</button>
+                    <button class="delete-btn" onclick="deleteQueue('${queue}')">删除队列</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        }
+    } catch (error) {
+        console.error('获取队列失败:', error);
+    }
+}
+
+async function viewQueueTasks(queueName) {
+    try {
+        document.getElementById('modalTitle').textContent = `队列 "${queueName}" 的任务详情`;
+        document.getElementById('taskModal').style.display = 'block';
+        
+        document.getElementById('pendingTasks').innerHTML = '加载中...';
+        document.getElementById('scheduledTasks').innerHTML = '加载中...';
+        document.getElementById('retryTasks').innerHTML = '加载中...';
+        
+        const res = await fetch(`http://localhost:8080/queues/${queueName}/tasks`);
+        const data = await res.json();
+        
+        renderTaskList(data.pending, 'pendingTasks', '待处理');
+        renderTaskList(data.scheduled, 'scheduledTasks', '计划');
+        renderTaskList(data.retry, 'retryTasks', '重试');
+        
+    } catch (error) {
+        console.error('获取任务详情出错:', error);
+        alert('获取任务详情时发生错误，请检查控制台');
+    }
+}
+
+function renderTaskList(tasks, containerId, title) {
+    const container = document.getElementById(containerId);
+    if (!tasks || tasks.length === 0) {
+        container.innerHTML = `<p>没有${title}任务</p>`;
+        return;
+    }
+    
+    container.innerHTML = '';
+    tasks.forEach(task => {
+        const taskDiv = document.createElement('div');
+        taskDiv.className = 'task-details';
+        taskDiv.innerHTML = `
+            <strong>ID:</strong> ${task.id}<br>
+            <strong>Type:</strong> ${task.type}<br>
+            <strong>Queue:</strong> ${task.queue}<br>
+            <strong>State:</strong> ${task.state}<br>
+            <strong>Payload:</strong> <pre>${formatPayload(task.payload)}</pre><br>
+            ${task.next_process_at ? `<strong>Next Process At:</strong> ${new Date(task.next_process_at).toLocaleString()}<br>` : ''}
+            ${task.last_error ? `<strong>Last Error:</strong> ${task.last_error}<br>` : ''}
+            <strong>Created At:</strong> ${new Date(task.created_at).toLocaleString()}
+        `;
+        container.appendChild(taskDiv);
+    });
+}
+
+function formatPayload(payload) {
+    try {
+        const obj = JSON.parse(payload);
+        return JSON.stringify(obj, null, 2);
+    } catch (e) {
+        return payload;
+    }
+}
+
+function openTab(evt, tabName) {
+    var i, tabcontent, tablinks;
+    tabcontent = document.getElementsByClassName("tabcontent");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+    }
+    tablinks = document.getElementsByClassName("tablinks");
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+    }
+    document.getElementById(tabName).style.display = "block";
+    evt.currentTarget.className += " active";
+}
+
+// 模态框关闭控制
+document.querySelector('.close').onclick = function() {
+    document.getElementById('taskModal').style.display = 'none';
+}
+window.onclick = function(event) {
+    const taskModal = document.getElementById('taskModal');
+    const workerModal = document.getElementById('workerModal');
+    if (event.target == taskModal) {
+        taskModal.style.display = 'none';
+    }
+    if (event.target == workerModal) {
+        workerModal.style.display = 'none';
+    }
+}
+
+async function deleteQueue(queueName) {
+    if (!confirm(`确定要删除队列 "${queueName}" 吗？此操作将删除该队列中的所有任务！`)) {
+        return;
+    }
+    try {
+        const res = await fetch(`http://localhost:8080/queues/${queueName}`, { method: 'DELETE' });
+        const result = await res.json();
+        if (res.ok) {
+            alert(`队列 "${queueName}" 已成功删除！`);
+            fetchQueues();
+        } else {
+            alert(`删除失败: ${result.error}`);
+        }
+    } catch (error) {
+        console.error('删除队列出错:', error);
+        alert('删除时发生错误，请检查控制台');
+    }
+}
+
+async function pushTask() {
+    const queue = document.getElementById('queue').value;
+    const type = document.getElementById('type').value;
+    const payload = document.getElementById('payload').value;
+
+    try {
+        const res = await fetch('http://localhost:8080/push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ queue, type, payload })
+        });
+        const result = await res.json();
+        alert('任务已推送! TaskID: ' + result.ID);
+        fetchQueues();
+    } catch (error) {
+        console.error('推送失败:', error);
+        alert('推送失败，请检查后端服务');
+    }
+}
+
+// ==================== 3. 消费者（Servers）管理逻辑 ====================
+let consumerData = []; // 缓存消费者数据供弹窗使用
+
+async function fetchConsumers() {
+    try {
+        const res = await fetch('http://localhost:8080/consumers');
+        const data = await res.json();
+        consumerData = data;
+        const tbody = document.querySelector('#consumerTable tbody');
+        tbody.innerHTML = '';
+
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#a0aec0;">暂无活跃的消费者</td></tr>';
+            return;
+        }
+
+        data.forEach((server, index) => {
+            const tr = document.createElement('tr');
+            const queueTags = Object.entries(server.queues || {}).map(
+                ([name, priority]) => `<span class="queue-tag">${name}(${priority})</span>`
+            ).join('');
+            const statusClass = server.status === 'active' ? 'status-active' : 'status-stopped';
+            const startedTime = server.started ? new Date(server.started).toLocaleString() : '-';
+            const workerCount = (server.active_workers || []).length;
+
+            tr.innerHTML = `
+                <td><strong>${server.host}:${server.pid}</strong><br><span style="color:#a0aec0;font-size:12px;">${server.id}</span></td>
+                <td>${server.concurrency}</td>
+                <td><div class="queue-tags">${queueTags || '-'}</div></td>
+                <td>${workerCount}</td>
+                <td><span class="status-badge ${statusClass}">${server.status}</span></td>
+                <td>${startedTime}</td>
+                <td>
+                    <button class="view-workers-btn" onclick="viewServerWorkers(${index})">查看 Workers</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (error) {
+        console.error('获取消费者失败:', error);
+    }
+}
+
+function viewServerWorkers(index) {
+    const server = consumerData[index];
+    if (!server) return;
+
+    document.getElementById('workerModalTitle').textContent = `Server ${server.host}:${server.pid} — 活跃 Workers`;
+    document.getElementById('workerModal').style.display = 'block';
+
+    const container = document.getElementById('workerList');
+    const workers = server.active_workers || [];
+
+    if (workers.length === 0) {
+        container.innerHTML = '<p>该 Server 当前没有活跃的 Worker</p>';
+        return;
+    }
+
+    container.innerHTML = '';
+    workers.forEach(w => {
+        const div = document.createElement('div');
+        div.className = 'worker-details';
+        const startedTime = w.started ? new Date(w.started).toLocaleString() : '-';
+        const deadlineTime = w.deadline ? new Date(w.deadline).toLocaleString() : '-';
+        let payloadDisplay = '';
+        try {
+            payloadDisplay = JSON.stringify(JSON.parse(w.task_payload), null, 2);
+        } catch (e) {
+            payloadDisplay = w.task_payload || '(empty)';
+        }
+        div.innerHTML = `
+            <strong>Task ID:</strong> ${w.task_id}<br>
+            <strong>Task Type:</strong> ${w.task_type}<br>
+            <strong>Queue:</strong> ${w.queue}<br>
+            <strong>Started:</strong> ${startedTime}<br>
+            <strong>Deadline:</strong> ${deadlineTime}<br>
+            <strong>Payload:</strong> <pre>${payloadDisplay}</pre>
+        `;
+        container.appendChild(div);
+    });
+}
+
+// Worker 模态框关闭控制
+document.getElementById('workerModalClose').onclick = function() {
+    document.getElementById('workerModal').style.display = 'none';
+}
+
+// 定时任务初始化
+fetchQueues();
+fetchConsumers();
+setInterval(fetchQueues, 5000);
+setInterval(fetchConsumers, 5000);
+</script>
+
+</body>
+</html>
